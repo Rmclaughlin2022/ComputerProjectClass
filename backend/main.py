@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 import models, database
+from api_integration import fetch_and_store_odds
 
 app = FastAPI()
 
@@ -38,3 +39,13 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_user)
     return db_user
+
+@app.post("/update-odds/")
+def update_odds(db: Session = Depends(get_db)):
+    fetch_and_store_odds(db)
+    return {"message": "Odds updated successfully"}
+
+@app.get("/odds")
+def get_odds(db: Session = Depends(get_db)):
+    odds = db.query(models.BettingOdds).all()
+    return odds
