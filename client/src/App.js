@@ -1,13 +1,27 @@
 import React from "react";
-import NFLOddsTable from "./NFLOddsTable";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import AppHeader from "../AppHeader.jsx";
+import ProtectedRoute from "../ProtectedRoute.jsx";
+import Login from "../Login.jsx";
+import SignUp from "../SignUp.jsx";   
+import OddsPage from "../OddsPage.jsx";
 
-function App() {
+export default function App() {
   return (
-    <div style={{ padding: "20px", fontFamily: "Arial" }}>
-      <h1>NFL Weekly Odds</h1>
-      <NFLOddsTable />
-    </div>
+    <BrowserRouter>
+      <AppHeader />
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <OddsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<SignUp />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
-
-export default App;

@@ -5,6 +5,14 @@ function NFLOddsTable() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  function toAmericanOdds(decimalOdds) {
+    if (decimalOdds >= 2.0) {
+      return `+${Math.round((decimalOdds - 1) * 100)}`;
+    } else {
+      return `${Math.round(-100 / (decimalOdds - 1))}`;
+    }
+  }
+
   useEffect(() => {
     fetch("http://localhost:8000/odds")
       .then((res) => {
@@ -20,10 +28,9 @@ function NFLOddsTable() {
         setError(error.message);
         setLoading(false);
       });
-  }, []);
+  }, []); //Run once 
 
   if (loading) return <p>Loading odds...</p>;
-  if (error) return <p style={{ color: "red" }}>Error: {error}</p>;
   if (!odds.length) return <p>No matchups found for this week.</p>;
 
   return (
@@ -45,21 +52,20 @@ function NFLOddsTable() {
               <td>{match.team1}</td>
               <td>{match.team2}</td>
               <td>{match.sports_books}</td>
-              <td>{match.odds_team1}</td>
-              <td>{match.odds_team2}</td>
+              <td>{toAmericanOdds(parseFloat(match.odds_team1))}</td>
+              <td>{toAmericanOdds(parseFloat(match.odds_team2))}</td>
               <td>
                 {new Date(match.match_date + "Z").toLocaleString("en-US", {
-                timeZone: "America/Chicago",
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-                hour: "numeric",
-                minute: "2-digit",
-                hour12: true
-        })}
-    </td>
-
-    </tr>
+                  timeZone: "America/Chicago",
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                  hour12: true,
+                })}
+              </td>
+            </tr>
           ))}
         </tbody>
       </table>
@@ -68,3 +74,4 @@ function NFLOddsTable() {
 }
 
 export default NFLOddsTable;
+

@@ -6,9 +6,14 @@ import models, database
 from api_integration import fetch_and_store_odds
 from sqlalchemy.orm import aliased
 from fastapi.responses import JSONResponse
+from sqlalchemy import func
+from datetime import datetime, timedelta
+from fastapi import HTTPException, status, Header
+from pydantic import EmailStr
+from auth import hash_password, verify_password, create_access_token, decode_access_token
 
+app = FastAPI(title="Sports Betting API", version="0.2.0")
 
-app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,14 +53,21 @@ def update_odds(db: Session = Depends(get_db)):
     fetch_and_store_odds(db)
     return {"message": "Odds updated successfully"}
 
-from sqlalchemy.orm import aliased
-from fastapi.responses import JSONResponse
-from datetime import datetime
-
 @app.get("/odds")
 def get_odds(db: Session = Depends(get_db)):
     team1 = aliased(models.SportsTeam)
     team2 = aliased(models.SportsTeam)
+
+  
+    today = datetime.utcnow().date()
+    weekday = today.weekday() 
+
+
+    days_since_tuesday = (weekday - 1) % 7
+    start_of_week = today - timedelta(days=days_since_tuesday)
+    end_of_week = start_of_week + timedelta(days=6)
+
+    print(f"Showing matches between {start_of_week} and {end_of_week}")
 
     results = (
         db.query(
@@ -70,7 +82,7 @@ def get_odds(db: Session = Depends(get_db)):
         .join(models.BettingOdds, models.Match.match_id == models.BettingOdds.match_id)
         .join(team1, models.Match.team1_id == team1.sports_teamsid)
         .join(team2, models.Match.team2_id == team2.sports_teamsid)
-        .limit(20)
+        .filter(func.date(models.Match.match_date).between(start_of_week, end_of_week))
         .all()
     )
 
@@ -87,3 +99,55 @@ def get_odds(db: Session = Depends(get_db)):
         })
 
     return JSONResponse(content=odds_list)
+
+class SignupInput(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+
+class LoginInput(BaseModel):
+    email: EmailStr
+    password: str
+
+@app.post("/auth/signup")
+def signup(data: SignupInput, db: Session = Depends(get_db)):
+    existing = db.query(models.User).filter(models.User.email == data.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    user = models.User(
+        name=data.name,
+        email=data.email,
+        password_hash=hash_password(data.password),
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return {"message": "Account created successfully", "user": {"id": user.user_id, "email": user.email}}
+
+@app.post("/auth/login")
+def login(data: LoginInput, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == data.email).first()
+    if not user or not verify_password(data.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    token = create_access_token({"sub": str(user.user_id), "email": user.email})
+    return {"access_token": token, "token_type": "bearer"}
+
+@app.get("/auth/me")
+def me(authorization: str | None = Header(default=None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Missing token")
+
+    token = authorization.split(" ", 1)[1]
+    try:
+        payload = decode_access_token(token)
+        user_id = payload.get("sub")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    user = db.query(models.User).filter(models.User.user_id == int(user_id)).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    return {"id": user.user_id, "name": user.name, "email": user.email, "role": user.role}

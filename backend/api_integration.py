@@ -1,4 +1,3 @@
-# api_integration.py
 import requests
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -7,6 +6,7 @@ import models
 API_KEY = "d8ccd0d282c783d88e87dd347f9db9e0"
 BASE_URL = "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/"
 
+# Send a get request to The Odds API and store the data in the database
 def fetch_and_store_odds(db: Session):
     params = {
         "apiKey": API_KEY,
@@ -15,20 +15,21 @@ def fetch_and_store_odds(db: Session):
         "oddsFormat": "decimal",
     }
 
-    print("Fetching odds from The Odds API...")
+    print("Fetching odds from The Odds API")
     response = requests.get(BASE_URL, params=params)
     if response.status_code != 200:
         raise Exception(f"Error fetching odds: {response.text}")
 
-    data = response.json()
+    data = response.json() # List of events with odds
 
+    # Goes through each event and stores/updates the relevant info in the database
     for event in data:
         sport_name = "American Football"
         team1_name = event["home_team"]
         team2_name = event["away_team"]
         match_date = event.get("commence_time")
 
-        # --- Sport ---
+        #Sport
         sport = db.query(models.Sport).filter_by(sport_name=sport_name).first()
         if not sport:
             sport = models.Sport(sport_name=sport_name)
@@ -36,7 +37,7 @@ def fetch_and_store_odds(db: Session):
             db.commit()
             db.refresh(sport)
 
-        # --- Teams ---
+        #Teams
         team1 = db.query(models.SportsTeam).filter_by(team_name=team1_name).first()
         if not team1:
             team1 = models.SportsTeam(sport_id=sport.sport_id, team_name=team1_name)
@@ -51,7 +52,7 @@ def fetch_and_store_odds(db: Session):
             db.commit()
             db.refresh(team2)
 
-        # --- Match ---
+        #Match
         match = (
             db.query(models.Match)
             .filter_by(team1_id=team1.sports_teamsid, team2_id=team2.sports_teamsid)
@@ -69,11 +70,11 @@ def fetch_and_store_odds(db: Session):
             db.commit()
             db.refresh(match)
 
-        # --- Odds ---
-        for bookmaker in event["bookmakers"]:
-            book_name = bookmaker["title"]
+        #Odds
+        for SportsBook in event["SportsBooks"]:
+            book_name = SportsBook["title"]
 
-            for market in bookmaker["markets"]:
+            for market in SportsBook["markets"]:
                 if market["key"] != "h2h":
                     continue
                 outcomes = market["outcomes"]
@@ -93,4 +94,3 @@ def fetch_and_store_odds(db: Session):
                 db.add(new_odds)
         db.commit()
 
-    print("Odds successfully updated from The Odds API.")
