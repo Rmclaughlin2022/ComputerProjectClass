@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { me, logout, getToken } from "../api";
 import { Link, useNavigate } from "react-router-dom";
 
-export default function AppHeader() {
+ function AppHeader() {
   const [user, setUser] = useState(null);
   const nav = useNavigate();
 
@@ -30,7 +30,6 @@ export default function AppHeader() {
         Sports Betting
       </h2>
 
-      {/* Right side buttons */}
       <div style={{ display: "flex", gap: "10px" }}>
         {user ? (
           <>
@@ -80,4 +79,4 @@ export default function AppHeader() {
       </div>
     </header>
   );
-}
+} export default AppHeader;
