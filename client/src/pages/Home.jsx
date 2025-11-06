@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import NFLOddsTable from "../components/NFLOddsTable.jsx";
+import NFLOddsTable from "./NFLOddsTable.jsx";
 import "./home.css";
 
 const SPORTS = ["NFL", "NBA", "NHL", "CFB", "CBB", "Soccer", "Tennis"];
