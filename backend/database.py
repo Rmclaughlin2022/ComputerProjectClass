@@ -4,6 +4,6 @@ from sqlalchemy.orm import sessionmaker
 
 DATABASE_URL = "postgresql://postgres:McLa1910@localhost:5433/sports_betting"
 
-engine = create_engine(DATABASE_URL) #Connects to the database
+engine = create_engine(DATABASE_URL) 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base() 

@@ -7,6 +7,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import func
 from sqlalchemy.orm import Session, aliased
+from api_integration import fetch_provider_json
+
 
 from datetime import datetime, timedelta
 from fastapi import Query
@@ -38,7 +40,7 @@ def get_db():
     finally:
         db.close()
 
-# ---------- Schemas ----------
+# Schema
 class UserCreate(BaseModel):
     username: str
     email: str
@@ -52,7 +54,7 @@ class LoginInput(BaseModel):
     email: EmailStr
     password: str
 
-# ---------- Routes ----------
+# Routes
 @app.get("/")
 def root():
     return {"message": "connected"}
@@ -102,7 +104,6 @@ def get_odds(
         .join(team2, models.Match.team2_id == team2.sports_teamsid)
     )
 
-    # Build datetime window
     if date_from and date_to:
         start_dt = datetime.fromisoformat(f"{date_from}T00:00:00")
         end_dt = datetime.fromisoformat(f"{date_to}T23:59:59")
@@ -111,7 +112,7 @@ def get_odds(
         end_dt = start_dt + timedelta(days=14)
     else:
         today = datetime.utcnow().date()
-        start_of_week = today - timedelta(days=(today.weekday() - 1) % 7)  # Tue start
+        start_of_week = today - timedelta(days=(today.weekday() - 1) % 7)  
         start_dt = datetime.combine(start_of_week, datetime.min.time())
         end_dt = datetime.combine(start_of_week + timedelta(days=6), datetime.max.time())
 
@@ -135,7 +136,7 @@ def get_odds(
         for r in rows
     ])
 
-# ---------- Auth ----------
+# Auth
 @app.post("/auth/signup")
 def signup(data: SignupInput, db: Session = Depends(get_db)):
     existing = db.query(models.User).filter(models.User.email == data.email).first()
@@ -168,11 +169,19 @@ def me(authorization: str | None = Header(default=None), db: Session = Depends(g
         raise HTTPException(status_code=401, detail="User not found")
     return {"id": user.user_id, "name": user.name, "email": user.email, "role": user.role}
 
-# ---------- Debug helpers ----------
+# Debug helpers
 @app.get("/debug/counts")
 def counts(db: Session = Depends(get_db)):
     return {
         "teams": db.query(models.SportsTeam).count(),
         "matches": db.query(models.Match).count(),
         "odds": db.query(models.BettingOdds).count(),
+    }
+@app.get("/debug/provider")
+def debug_provider():
+    data = fetch_provider_json()
+    return {
+        "count": len(data),
+        "sample_keys": list(data[0].keys()) if data else [],
+        "first_commence_time": data[0].get("commence_time") if data else None,
     }

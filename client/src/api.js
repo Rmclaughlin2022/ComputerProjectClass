@@ -19,7 +19,13 @@ export async function signup(payload) {
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  const data = await res.json();
+
+  // If you ever auto-login on signup, you can set the token and refresh here too:
+  // const token = data?.access_token || data?.token || data?.jwt;
+  // if (token) { setToken(token); window.dispatchEvent(new Event("auth-changed")); window.location.replace("/"); }
+
+  return data;
 }
 
 export async function login(payload) {
@@ -29,7 +35,17 @@ export async function login(payload) {
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  const data = await res.json();
+
+  // Save token if provided
+  const token = data?.access_token || data?.token || data?.jwt;
+  if (token) setToken(token);
+
+  // Notify listeners (optional) and force a full reload to home
+  window.dispatchEvent(new Event("auth-changed"));
+  window.location.replace("/"); // hard refresh so header updates immediately
+
+  return data; // (won't run after replace, but harmless)
 }
 
 export async function me() {
@@ -40,5 +56,6 @@ export async function me() {
 
 export function logout() {
   setToken(null);
+  window.dispatchEvent(new Event("auth-changed"));
   window.location.href = "/login";
 }
