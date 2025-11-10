@@ -10,14 +10,7 @@ export default function AppHeader() {
   async function fetchUser() {
     const token = getToken();
     if (!token) { setUser(null); setLoading(false); return; }
-    try {
-      const u = await me();
-      setUser(u);
-    } catch {
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
+    try { setUser(await me()); } catch { setUser(null); } finally { setLoading(false); }
   }
 
   useEffect(() => {
@@ -31,101 +24,111 @@ export default function AppHeader() {
     };
   }, []);
 
+  const btnBase = {
+    padding: "8px 12px",
+    borderRadius: 10,
+    fontWeight: 600,
+    textDecoration: "none",
+    transition: "all .15s ease",
+  };
+
   return (
-    <header
-      style={{
-        padding: "12px 16px",
-        borderBottom: "1px solid #0b0b0b",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        background: "rgba(7, 4, 4, 0.85)",
-        backdropFilter: "blur(6px)",
-        color: "#E0F7FA",
-      }}
+  <header
+    style={{
+      position: "sticky",
+      top: 0,
+      zIndex: 50,
+      boxSizing: "border-box",
+      background: "#0B0B0B",
+      borderBottom: "1px solid #1F2937",
+      boxShadow: "0 1px 0 rgba(255,255,255,0.02)",
+      padding: "12px 16px",             
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",   
+      color: "#E2E8F0",
+    }}
+  >
+    {/* Left: logo + brand */}
+    <div
+      onClick={() => nav("/")}
+      style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}
     >
-      {/* Logo + Title */}
-      <div
-        onClick={() => nav("/")}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          cursor: "pointer",
-          userSelect: "none",
-          textDecoration: "none",
-          color: "inherit",
-        }}
-      >
-        <img
-          src="/images/sportsLogo.png"
+      <img
+        src="/images/sportsLogo.png"
+        alt="WinCurve logo"
+        style={{ height: 50, width: 50, objectFit: "contain", borderRadius: 6 }}
+      />
+      <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: 0.3 }}>WinCurve</span>
+    </div>
 
-          alt="WinCurve logo"
-          style={{
-            height: 50,
-            width: 50,
-            objectFit: "contain",
-            borderRadius: 6,
-            display: "block",
-            filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.3))",
-          }}
-        />
-        <h2 style={{ fontWeight: 700, margin: 0 }}>WinCurve</h2>
-      </div>
+    {/* Right: auth actions*/}
+    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+      {loading ? null : user ? (
+        <>
+          <span style={{ color: "#9CA3AF" }}>
+            Hello, <span style={{ color: "#E5E7EB" }}>{user.name}</span>
+          </span>
+          <button
+            onClick={() => {
+              logout();
+              window.dispatchEvent(new Event("auth-changed"));
+              nav("/login");
+            }}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 10,
+              fontWeight: 600,
+              background: "#00C896",
+              color: "#001C33",
+              border: "1px solid #00a881",
+              transition: "all .15s ease",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.filter = "brightness(0.95)")}
+            onMouseLeave={(e) => (e.currentTarget.style.filter = "none")}
+          >
+            Logout
+          </button>
+        </>
+      ) : (
+        <>
+          <Link
+            to="/login"
+            style={{
+              padding: "8px 12px",
+              borderRadius: 10,
+              fontWeight: 600,
+              color: "#E0F7FA",
+              border: "1px solid #2DD4BF",
+              textDecoration: "none",
+              transition: "all .15s ease",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(45,212,191,0.08)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+          >
+            Log in
+          </Link>
+          <Link
+            to="/signup"
+            style={{
+              padding: "8px 12px",
+              borderRadius: 10,
+              fontWeight: 600,
+              background: "#00C896",
+              color: "#001C33",
+              border: "1px solid #00a881",
+              textDecoration: "none",
+              transition: "all .15s ease",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.filter = "brightness(0.95)")}
+            onMouseLeave={(e) => (e.currentTarget.style.filter = "none")}
+          >
+            Sign up
+          </Link>
+        </>
+      )}
+    </div>
+  </header>
+);
 
-      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-        {loading ? null : user ? (
-          <>
-            <span>Hello, {user.name}</span>
-            <button
-              onClick={() => {
-                logout();
-                window.dispatchEvent(new Event("auth-changed"));
-                nav("/login");
-              }}
-              style={{
-                background: "#00C896",
-                color: "#001C33",
-                border: "none",
-                borderRadius: 8,
-                padding: "6px 10px",
-                cursor: "pointer",
-                fontWeight: 600,
-              }}
-            >
-              Logout
-            </button>
-          </>
-        ) : (
-          <>
-            <Link
-              to="/login"
-              style={{
-                color: "#E0F7FA",
-                textDecoration: "none",
-                padding: "6px 10px",
-                borderRadius: 8,
-                border: "1px solid #2dd4bf",
-              }}
-            >
-              Log in
-            </Link>
-            <Link
-              to="/signup"
-              style={{
-                background: "#00C896",
-                color: "#001C33",
-                borderRadius: 8,
-                padding: "6px 10px",
-                textDecoration: "none",
-                fontWeight: 600,
-              }}
-            >
-              Sign up
-            </Link>
-          </>
-        )}
-      </div>
-    </header>
-  );
 }
