@@ -1,96 +1,138 @@
-# api_integration.py
+import os
+from datetime import datetime
+from typing import List, Dict
+
 import requests
 from sqlalchemy.orm import Session
-from datetime import datetime
+from dotenv import load_dotenv
+
 import models
 
-API_KEY = "d8ccd0d282c783d88e87dd347f9db9e0"
-BASE_URL = "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/"
+load_dotenv()
 
-def fetch_and_store_odds(db: Session):
+API_KEY = os.getenv("SPORTS_API_KEY", "d8ccd0d282c783d88e87dd347f9db9e0")
+BASE_URL = "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds"
+
+
+def _parse_commence_time(s: str) -> datetime:
+    """Odds API uses ISO8601 like '2025-11-07T01:15:00Z'. Return naive UTC datetime."""
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+    return datetime.fromisoformat(s).replace(tzinfo=None)
+
+
+def fetch_provider_json() -> List[Dict]:
     params = {
         "apiKey": API_KEY,
-        "regions": "us",  
-        "markets": "h2h",  
+        "regions": "us",
+        "markets": "h2h",
         "oddsFormat": "decimal",
     }
+    r = requests.get(BASE_URL, params=params, timeout=20)
+    if r.status_code != 200:
+        raise RuntimeError(f"Provider error {r.status_code}: {r.text[:200]}")
+    data = r.json()
+    if not isinstance(data, list):
+        raise RuntimeError("Provider returned non-list")
+    return data
 
-    print("Fetching odds from The Odds API...")
-    response = requests.get(BASE_URL, params=params)
-    if response.status_code != 200:
-        raise Exception(f"Error fetching odds: {response.text}")
 
-    data = response.json()
+def fetch_and_store_odds(db: Session) -> None:
+    events = fetch_provider_json()
 
-    for event in data:
-        sport_name = "American Football"
-        team1_name = event["home_team"]
-        team2_name = event["away_team"]
-        match_date = event.get("commence_time")
+    sport = db.query(models.Sport).filter_by(sport_name="American Football").first()
+    if not sport:
+        sport = models.Sport(sport_name="American Football")
+        db.add(sport)
+        db.commit()
+        db.refresh(sport)
 
-        # --- Sport ---
-        sport = db.query(models.Sport).filter_by(sport_name=sport_name).first()
-        if not sport:
-            sport = models.Sport(sport_name=sport_name)
-            db.add(sport)
+    for ev in events:
+        home = ev.get("home_team")
+        away = ev.get("away_team")
+        ct = ev.get("commence_time")
+        books = ev.get("bookmakers")  
+
+        if not (home and away and ct):
+            continue
+
+        when = _parse_commence_time(ct) 
+
+        # Teams
+        t1 = db.query(models.SportsTeam).filter_by(team_name=home).first()
+        if not t1:
+            t1 = models.SportsTeam(sport_id=sport.sport_id, team_name=home)
+            db.add(t1)
             db.commit()
-            db.refresh(sport)
+            db.refresh(t1)
 
-        # --- Teams ---
-        team1 = db.query(models.SportsTeam).filter_by(team_name=team1_name).first()
-        if not team1:
-            team1 = models.SportsTeam(sport_id=sport.sport_id, team_name=team1_name)
-            db.add(team1)
+        t2 = db.query(models.SportsTeam).filter_by(team_name=away).first()
+        if not t2:
+            t2 = models.SportsTeam(sport_id=sport.sport_id, team_name=away)
+            db.add(t2)
             db.commit()
-            db.refresh(team1)
+            db.refresh(t2)
 
-        team2 = db.query(models.SportsTeam).filter_by(team_name=team2_name).first()
-        if not team2:
-            team2 = models.SportsTeam(sport_id=sport.sport_id, team_name=team2_name)
-            db.add(team2)
-            db.commit()
-            db.refresh(team2)
-
-        # --- Match ---
         match = (
             db.query(models.Match)
-            .filter_by(team1_id=team1.sports_teamsid, team2_id=team2.sports_teamsid)
+            .filter(
+                models.Match.sport_id == sport.sport_id,
+                models.Match.team1_id == t1.sports_teamsid,
+                models.Match.team2_id == t2.sports_teamsid,
+                models.Match.match_date == when,
+            )
             .first()
         )
         if not match:
             match = models.Match(
                 sport_id=sport.sport_id,
-                team1_id=team1.sports_teamsid,
-                team2_id=team2.sports_teamsid,
-                match_date=match_date,
+                team1_id=t1.sports_teamsid,
+                team2_id=t2.sports_teamsid,
+                match_date=when,
                 location="TBD",
             )
             db.add(match)
             db.commit()
             db.refresh(match)
 
-        # --- Odds ---
-        for bookmaker in event["bookmakers"]:
-            book_name = bookmaker["title"]
-
-            for market in bookmaker["markets"]:
-                if market["key"] != "h2h":
-                    continue
-                outcomes = market["outcomes"]
-                if len(outcomes) < 2:
+        if isinstance(books, list):
+            for bk in books:
+                book_name = bk.get("title") or bk.get("key") or "Unknown"
+                markets = bk.get("markets") or []
+                h2h = next((m for m in markets if m.get("key") == "h2h"), None)
+                if not h2h:
                     continue
 
-                odds_team1 = outcomes[0]["price"]
-                odds_team2 = outcomes[1]["price"]
+                outcomes = h2h.get("outcomes") or []
+                prices = {str(o.get("name")): o.get("price") for o in outcomes if "name" in o}
+                o1 = prices.get(home)
+                o2 = prices.get(away)
+                if o1 is None or o2 is None and len(outcomes) >= 2:
+                    o1 = o1 if o1 is not None else outcomes[0].get("price")
+                    o2 = o2 if o2 is not None else outcomes[1].get("price")
+                if o1 is None or o2 is None:
+                    continue
 
-                new_odds = models.BettingOdds(
-                    match_id=match.match_id,
-                    sports_books=book_name,
-                    odds_team1=odds_team1,
-                    odds_team2=odds_team2,
-                    updated_at=datetime.utcnow(),
+                existing = (
+                    db.query(models.BettingOdds)
+                    .filter(
+                        models.BettingOdds.match_id == match.match_id,
+                        models.BettingOdds.sports_books == book_name,
+                    )
+                    .first()
                 )
-                db.add(new_odds)
-        db.commit()
-
-    print("Odds successfully updated from The Odds API.")
+                if existing:
+                    existing.odds_team1 = float(o1)
+                    existing.odds_team2 = float(o2)
+                    existing.updated_at = datetime.utcnow()
+                else:
+                    db.add(
+                        models.BettingOdds(
+                            match_id=match.match_id,
+                            sports_books=book_name,
+                            odds_team1=float(o1),
+                            odds_team2=float(o2),
+                            updated_at=datetime.utcnow(),
+                        )
+                    )
+            db.commit()

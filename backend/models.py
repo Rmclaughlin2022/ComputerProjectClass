@@ -1,4 +1,3 @@
-# backend/models.py
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -11,6 +10,7 @@ class User(Base):
     name = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False)
     role = Column(String, default="user")
+    password_hash = Column(String, nullable=False)
 
     bets = relationship("Bet", back_populates="user")
 
@@ -24,7 +24,7 @@ class Sport(Base):
     teams = relationship("SportsTeam", back_populates="sport")
     matches = relationship("Match", back_populates="sport")
 
-                   
+
 class SportsTeam(Base):
     __tablename__ = "sports_teams"
 
@@ -53,8 +53,8 @@ class Match(Base):
 
     match_id = Column(Integer, primary_key=True, index=True)
     sport_id = Column(Integer, ForeignKey("sports.sport_id"))
-    team1_id = Column(Integer)
-    team2_id = Column(Integer)
+    team1_id = Column(Integer, ForeignKey("sports_teams.sports_teamsid"))
+    team2_id = Column(Integer, ForeignKey("sports_teams.sports_teamsid"))
     match_date = Column(DateTime)
     location = Column(String)
     final_score = Column(String)
@@ -93,9 +93,9 @@ class Prediction(Base):
 class HistoricalStats(Base):
     __tablename__ = "historical_stats"
 
-    HistStats_id = Column(Integer, primary_key=True, index=True)
+    histstats_id = Column(Integer, primary_key=True, index=True)
     match_id = Column(Integer, ForeignKey("matches.match_id"))
-    team_id = Column(Integer)
+    team_id = Column(Integer, ForeignKey("sports_teams.sports_teamsid"))
     stats_ = Column(String)
 
     match = relationship("Match", back_populates="historical_stats")
@@ -104,12 +104,12 @@ class HistoricalStats(Base):
 class Bet(Base):
     __tablename__ = "bets"
 
-    Bet_id = Column(Integer, primary_key=True, index=True)
-    User_id = Column(Integer, ForeignKey("users.user_id"))
-    Match_id = Column(Integer, ForeignKey("matches.match_id"))
-    Prediction_id = Column(Integer, ForeignKey("predictions.prediction_id"))
-    Amount = Column(Float)
-    Outcome = Column(String)
+    bet_id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"))
+    match_id = Column(Integer, ForeignKey("matches.match_id"))
+    prediction_id = Column(Integer, ForeignKey("predictions.prediction_id"))
+    amount = Column(Float)
+    outcome = Column(String)
     profit_loss = Column(Float)
 
     user = relationship("User", back_populates="bets")
