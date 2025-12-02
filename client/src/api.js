@@ -21,10 +21,6 @@ export async function signup(payload) {
   if (!res.ok) throw new Error(await res.text());
   const data = await res.json();
 
-  // If you ever auto-login on signup, you can set the token and refresh here too:
-  // const token = data?.access_token || data?.token || data?.jwt;
-  // if (token) { setToken(token); window.dispatchEvent(new Event("auth-changed")); window.location.replace("/"); }
-
   return data;
 }
 
@@ -41,11 +37,10 @@ export async function login(payload) {
   const token = data?.access_token || data?.token || data?.jwt;
   if (token) setToken(token);
 
-  // Notify listeners (optional) and force a full reload to home
   window.dispatchEvent(new Event("auth-changed"));
   window.location.replace("/"); // hard refresh so header updates immediately
 
-  return data; // (won't run after replace, but harmless)
+  return data;
 }
 
 export async function me() {

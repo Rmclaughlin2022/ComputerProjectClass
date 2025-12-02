@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from "react";
 import NFLOddsTable from "../pages/NFLOddsTable.jsx";
-import "./home.css";
+import "./Home.css";
 
-const SPORTS = ["NFL", "NBA", "NHL", "CFB", "CBB", "Soccer", "Tennis"];
+const SPORTS = ["NFL"];
 
 export default function Home() {
   const [sport, setSport] = useState("NFL");
