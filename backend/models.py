@@ -113,3 +113,15 @@ class Bet(Base):
     profit_loss = Column(Float)
 
     user = relationship("User", back_populates="bets")
+
+
+class TeamRating(Base):
+    __tablename__ = "team_ratings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    # This MUST match SportsTeam.team_name (what you label as team1/team2 in /odds)
+    team_name = Column(String, unique=True, nullable=False, index=True)
+
+    offense_rating = Column(Float, nullable=False, default=0.0)
+    defense_rating = Column(Float, nullable=False, default=0.0)
+    overall_rating = Column(Float, nullable=False, default=0.0)

@@ -25,8 +25,8 @@ export default function AIPredictions() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const [minEdge, setMinEdge] = useState(2); 
   const [query, setQuery] = useState("");
+  const [minEdge, setMinEdge] = useState(0); // 🔥 minimum edge in pts to show
 
   const load = useCallback(() => {
     setLoading(true);
@@ -61,15 +61,19 @@ export default function AIPredictions() {
         const p1Book = impliedProbFromDecimal(t1Dec);
         const p2Book = impliedProbFromDecimal(t2Dec);
 
-        // Edge in percentage points: model% - book%
-        const edge1 = Number.isFinite(p1Model) && Number.isFinite(p1Book)
-          ? (p1Model - p1Book) * 100
-          : NaN;
-        const edge2 = Number.isFinite(p2Model) && Number.isFinite(p2Book)
-          ? (p2Model - p2Book) * 100
-          : NaN;
+        const edge1 =
+          Number.isFinite(p1Model) && Number.isFinite(p1Book)
+            ? (p1Model - p1Book) * 100
+            : NaN;
+        const edge2 =
+          Number.isFinite(p2Model) && Number.isFinite(p2Book)
+            ? (p2Model - p2Book) * 100
+            : NaN;
 
-        const bestEdge = Math.max(edge1 || -Infinity, edge2 || -Infinity);
+        const bestEdge = Math.max(
+          edge1 ?? Number.NEGATIVE_INFINITY,
+          edge2 ?? Number.NEGATIVE_INFINITY
+        );
 
         let valueSide = "-";
         if (Number.isFinite(edge1) || Number.isFinite(edge2)) {
@@ -94,25 +98,36 @@ export default function AIPredictions() {
         };
       })
       .filter((row) => {
+        // search filter
         if (q) {
           const hay = `${row.team1} ${row.team2} ${row.sports_books}`.toLowerCase();
           if (!hay.includes(q)) return false;
         }
+        // edge filter
         if (!Number.isFinite(row.bestEdge)) return false;
         if (row.bestEdge < minEdge) return false;
         return true;
       })
-      .sort((a, b) => b.bestEdge - a.bestEdge); 
-  }, [rows, minEdge, query]);
+      .sort((a, b) => b.bestEdge - a.bestEdge); // best edges on top
+  }, [rows, query, minEdge]);
 
   return (
     <div style={{ padding: 16 }}>
-      <h2 style={{ marginBottom: 8 }}>AI Value Bets (NFL)</h2>
-      <p style={{ marginTop: 0, marginBottom: 16, fontSize: 13, opacity: 0.8 }}>
-        These are matchups where your model&apos;s win probabilities think a side is
-        underpriced by the sportsbook. Higher edge = better expected value.
+      <h2 style={{ marginBottom: 8 }}>AI Predictions</h2>
+      <p
+        style={{
+          marginTop: 0,
+          marginBottom: 16,
+          fontSize: 13,
+          opacity: 0.8,
+        }}
+      >
+        Model win probabilities are based on your team ratings. Edge = model win% −
+        book win% (in percentage points). Increase the min edge to only see your
+        favorite value bets.
       </p>
 
+      {/* Controls */}
       <div
         style={{
           display: "flex",
@@ -124,20 +139,21 @@ export default function AIPredictions() {
       >
         <button onClick={load}>Reload AI predictions</button>
 
-        <label style={{ fontSize: 13 }}>
-          Min edge:
-          <select
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          <span style={{ fontSize: 13 }}>Min edge (pts):</span>
+          <input
+            type="number"
             value={minEdge}
-            onChange={(e) => setMinEdge(Number(e.target.value))}
-            style={{ marginLeft: 6 }}
-          >
-            <option value={0}>0%</option>
-            <option value={1}>1%</option>
-            <option value={2}>2%</option>
-            <option value={3}>3%</option>
-            <option value={5}>5%</option>
-          </select>
-        </label>
+            onChange={(e) => setMinEdge(Number(e.target.value) || 0)}
+            style={{ width: 70, padding: "4px 6px", fontSize: 13 }}
+          />
+        </div>
 
         <div
           style={{
@@ -190,7 +206,9 @@ export default function AIPredictions() {
             )}
             {!loading && !err && enriched.length === 0 && (
               <tr>
-                <td colSpan={12}>No value bets found with current filters.</td>
+                <td colSpan={12}>
+                  No value bets found with current filters.
+                </td>
               </tr>
             )}
             {!loading &&
@@ -203,10 +221,18 @@ export default function AIPredictions() {
                   <td>{m.sports_books}</td>
                   <td>{m.t1Money}</td>
                   <td>{m.t2Money}</td>
-                  <td>{Number.isFinite(m.p1Model) ? toPercent(m.p1Model) : "-"}</td>
-                  <td>{Number.isFinite(m.p2Model) ? toPercent(m.p2Model) : "-"}</td>
-                  <td>{Number.isFinite(m.p1Book) ? toPercent(m.p1Book) : "-"}</td>
-                  <td>{Number.isFinite(m.p2Book) ? toPercent(m.p2Book) : "-"}</td>
+                  <td>
+                    {Number.isFinite(m.p1Model) ? toPercent(m.p1Model) : "-"}
+                  </td>
+                  <td>
+                    {Number.isFinite(m.p2Model) ? toPercent(m.p2Model) : "-"}
+                  </td>
+                  <td>
+                    {Number.isFinite(m.p1Book) ? toPercent(m.p1Book) : "-"}
+                  </td>
+                  <td>
+                    {Number.isFinite(m.p2Book) ? toPercent(m.p2Book) : "-"}
+                  </td>
                   <td>
                     {Number.isFinite(m.edge1)
                       ? `${m.edge1.toFixed(1)} pts`
